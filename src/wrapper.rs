@@ -307,7 +307,7 @@ impl<T> TryFrom<*mut RzVector> for Vector<T> {
 
 impl<T> AsMut<[T]> for Vector<T> {
     fn as_mut(&mut self) -> &mut [T] {
-        self
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
     }
 }
 
@@ -315,13 +315,13 @@ impl<T> Deref for Vector<T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
+        unsafe { slice::from_raw_parts(self.as_mut_ptr() as *const T, self.len()) }
     }
 }
 
 impl<T> DerefMut for Vector<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_mut()
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
     }
 }
 
