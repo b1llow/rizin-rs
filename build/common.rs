@@ -110,36 +110,32 @@ pub fn search_files(filenames: &[String], variable: &str) -> Vec<(PathBuf, Strin
 
     // Search the directories in the `LD_LIBRARY_PATH` environment variable.
     if let Ok(path) = env::var("LD_LIBRARY_PATH") {
-        env::split_paths(&path)
-            .map(|x| x.to_string_lossy().into())
-            .collect_into(&mut directories);
+        directories.extend(
+            env::split_paths(&path).map(|x| x.to_string_lossy().into()),
+        );
     }
 
     if target_os!("linux") || target_os!("freebsd") {
-        DIRECTORIES_LINUX
-            .into_iter()
-            .map(|x| x.to_string())
-            .collect_into(&mut directories);
+        directories.extend(DIRECTORIES_LINUX.iter().map(|x| x.to_string()));
     } else if target_os!("macos") {
-        DIRECTORIES_MACOS
-            .into_iter()
-            .map(|x| x.to_string())
-            .collect_into(&mut directories);
+        directories.extend(DIRECTORIES_MACOS.iter().map(|x| x.to_string()));
     } else if target_os!("windows") {
         let msvc = target_env!("msvc");
-        DIRECTORIES_WINDOWS
-            .iter()
-            .filter(|d| d.1 || !msvc)
-            .map(|d| d.0.into())
-            .collect_into(&mut directories);
+        directories.extend(
+            DIRECTORIES_WINDOWS
+                .iter()
+                .filter(|d| d.1 || !msvc)
+                .map(|d| d.0.into()),
+        );
     }
 
     if let Ok(home_dir) = env::var("HOME") {
         let local_dir: PathBuf = [home_dir, ".local".into()].iter().collect();
-        DIRECTORIES_LOCAL
-            .iter()
-            .map(|x| local_dir.join(*x).to_string_lossy().into())
-            .collect_into(&mut directories);
+        directories.extend(
+            DIRECTORIES_LOCAL
+                .iter()
+                .map(|x| local_dir.join(*x).to_string_lossy().into()),
+        );
     }
 
     // We use temporary directories when testing the build script, so we'll

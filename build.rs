@@ -1,4 +1,3 @@
-#![feature(iter_collect_into)]
 
 use crate::common::search_libs;
 use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
