@@ -46,7 +46,7 @@
             version = "0.9.1";
             src = ./.;
 
-            cargoHash = "sha256-7R8qH1D1UuHfU5bDRokeDu6pSDV6lKIZY0Fzjr4O3Cw=";
+            cargoHash = "sha256-MGc5nPdTvEqLvZ8ute0O3SH5D9dlvj1yOLNfu3ADgrM=";
 
             nativeBuildInputs = [
               rustPlatform.bindgenHook
