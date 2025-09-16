@@ -73,8 +73,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=wrapper.h");
 
     let builder = bindgen::Builder::default().header("wrapper.h");
-    let builder = if let Ok(dir) = env::var("RIZIN_DIR").or(env::var("HOME")) {
-        let rizin_dir = PathBuf::from(dir).join(".local");
+    let builder = if let Ok(dir) = env::var("RIZIN_DIR") {
+        let rizin_dir = PathBuf::from(dir);
         let inc_dir = rizin_dir.join("include");
         builder.clang_args([
             "-I",
@@ -83,8 +83,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             inc_dir.join("librz").to_str().unwrap(),
             "-I",
             inc_dir.join("librz").join("sdb").to_str().unwrap(),
-            "-I",
-            "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/",
         ])
     } else {
         builder

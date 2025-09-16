@@ -17,12 +17,6 @@ macro_rules! target_env {
     };
 }
 
-macro_rules! test {
-    () => {
-        cfg!(test)
-    };
-}
-
 //================================================
 // Commands
 //================================================
@@ -102,6 +96,13 @@ pub fn search_files(filenames: &[String], variable: &str) -> Vec<(PathBuf, Strin
             }
         }
 
+        if path.is_dir() {
+            let lib_dir = path.join("lib");
+            if lib_dir.exists() {
+                return search_directory(&lib_dir, filenames);
+            }
+        }
+
         // Check if the path is directory containing a matching file.
         return search_directory(&path, filenames);
     }
@@ -138,7 +139,7 @@ pub fn search_files(filenames: &[String], variable: &str) -> Vec<(PathBuf, Strin
         );
     }
 
-    // We use temporary directories when testing the build script, so we'll
+/*     // We use temporary directories when testing the build script, so we'll
     // remove the prefixes that make the directories absolute.
     let directories = if test!() {
         directories
@@ -152,7 +153,7 @@ pub fn search_files(filenames: &[String], variable: &str) -> Vec<(PathBuf, Strin
             .collect::<Vec<_>>()
     } else {
         directories
-    };
+    }; */
 
     let mut options = MatchOptions::new();
     options.case_sensitive = false;

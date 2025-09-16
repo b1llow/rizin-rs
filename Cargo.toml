@@ -1,10 +1,10 @@
 [package]
 name = "rizin-rs"
-version = "0.1.2"
+version = "0.9.0"
 edition = "2021"
 license = "LGPL-3.0-only"
 description = "Rust bindings for rizin"
-exclude = ["rizin/*"]
+exclude = ["rizin/*", "flake.*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,10 +20,7 @@ rpath = true
 doctest = false
 
 [workspace]
-members = [
-    "il-tests",
-    "sleigh-rs",
-]
+
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
