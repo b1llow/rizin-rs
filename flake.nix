@@ -43,7 +43,7 @@
           env
           // rec {
             pname = "rizin-rs";
-            version = "0.9.0";
+            version = "0.9.1";
             src = ./.;
 
             cargoHash = "sha256-7R8qH1D1UuHfU5bDRokeDu6pSDV6lKIZY0Fzjr4O3Cw=";
