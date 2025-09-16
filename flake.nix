@@ -26,26 +26,34 @@
         bpkgs = b.packages.${system};
         inherit (bpkgs) rizin;
 
-        rizin-rs = pkgs.rustPlatform.buildRustPackage rec {
-          pname = "rizin-rs";
-          version = "0.9.0";
-          src = ./.;
-
-          cargoLock.lockFile = ./Cargo.lock;
-
-          cargoHash = "";
-
-          buildInputs = [
-            rizin
-            pkgs.llvmPackages_18.libclang
-          ];
-
-          doCheck = false;
-
-          preConfigure = ''
-            export RIZIN_DIR=${rizin}
-          '';
+        env = {
+          RIZIN_DIR = "${rizin}";
+          LIBCLANG_PATH = "${pkgs.llvmPackages_18.libclang.lib}/lib";
         };
+
+        rizin-rs = pkgs.rustPlatform.buildRustPackage (
+          env
+          // rec {
+            pname = "rizin-rs";
+            version = "0.9.0";
+            src = ./.;
+
+            cargoLock.lockFile = ./Cargo.lock;
+
+            cargoHash = "";
+
+            buildInputs = [
+              rizin
+              pkgs.llvmPackages_18.libclang
+            ];
+
+            doCheck = false;
+
+            preConfigure = ''
+
+            '';
+          }
+        );
       in
       {
         formatter = nixfmt-tree;
@@ -56,20 +64,22 @@
         };
 
         devShells = {
-          default = pkgs.mkShell {
-            inputsFrom = [
-              self.packages.${system}.default
-            ];
-            packages = [
-              pkgs.rust-analyzer
-              pkgs.cargo-watch
-            ];
-            shellHook = ''
-              echo "🦀 Rust dev shell ready. Try: cargo run"
-                          export RIZIN_DIR=${rizin}
-            '';
-            RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-          };
+          default = pkgs.mkShell (
+            env
+            // {
+              inputsFrom = [
+                self.packages.${system}.default
+              ];
+              packages = [
+                pkgs.rust-analyzer
+                pkgs.cargo-watch
+              ];
+              shellHook = ''
+                echo "🦀 Rust dev shell ready. Try: cargo run"
+              '';
+              RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+            }
+          );
         };
 
       }
