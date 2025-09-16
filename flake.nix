@@ -22,29 +22,36 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        inherit (pkgs) lib nixfmt-tree;
+        inherit (pkgs)
+          lib
+          nixfmt-tree
+          rustPlatform
+          llvmPackages_18
+          mkShell
+          rust-analyzer
+          cargo-watch
+          ;
         bpkgs = b.packages.${system};
         inherit (bpkgs) rizin;
 
         env = {
           RIZIN_DIR = "${rizin}";
-          LIBCLANG_PATH = "${pkgs.llvmPackages_18.libclang.lib}/lib";
+          LIBCLANG_PATH = "${llvmPackages_18.libclang.lib}/lib";
         };
 
-        rizin-rs = pkgs.rustPlatform.buildRustPackage (
+        rizin-rs = rustPlatform.buildRustPackage (
           env
           // rec {
             pname = "rizin-rs";
             version = "0.9.0";
             src = ./.;
 
-            cargoLock.lockFile = ./Cargo.lock;
+            cargoHash = "sha256-ELLaVzhO10+ZNQRud92Q/WF3vi8RGhycw3OKPMwhGGs=";
 
-            cargoHash = "";
-
+            nativeBuildInputs = [ rustPlatform.bindgenHook ];
             buildInputs = [
               rizin
-              pkgs.llvmPackages_18.libclang
+              llvmPackages_18.libclang
             ];
 
             doCheck = false;
@@ -64,20 +71,20 @@
         };
 
         devShells = {
-          default = pkgs.mkShell (
+          default = mkShell (
             env
             // {
               inputsFrom = [
                 self.packages.${system}.default
               ];
               packages = [
-                pkgs.rust-analyzer
-                pkgs.cargo-watch
+                rust-analyzer
+                cargo-watch
               ];
               shellHook = ''
                 echo "🦀 Rust dev shell ready. Try: cargo run"
               '';
-              RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+              RUST_SRC_PATH = "${rustPlatform.rustLibSrc}";
             }
           );
         };
