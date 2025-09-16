@@ -1,7 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::fmt::Display;
 use std::marker::PhantomData;
-use std::mem::{ManuallyDrop, size_of};
+use std::mem::{size_of, ManuallyDrop};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::ptr::{addr_of, addr_of_mut, null_mut, NonNull};

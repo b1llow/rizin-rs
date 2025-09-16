@@ -111,9 +111,7 @@ pub fn search_files(filenames: &[String], variable: &str) -> Vec<(PathBuf, Strin
 
     // Search the directories in the `LD_LIBRARY_PATH` environment variable.
     if let Ok(path) = env::var("LD_LIBRARY_PATH") {
-        directories.extend(
-            env::split_paths(&path).map(|x| x.to_string_lossy().into()),
-        );
+        directories.extend(env::split_paths(&path).map(|x| x.to_string_lossy().into()));
     }
 
     if target_os!("linux") || target_os!("freebsd") {
@@ -139,7 +137,7 @@ pub fn search_files(filenames: &[String], variable: &str) -> Vec<(PathBuf, Strin
         );
     }
 
-/*     // We use temporary directories when testing the build script, so we'll
+    /*     // We use temporary directories when testing the build script, so we'll
     // remove the prefixes that make the directories absolute.
     let directories = if test!() {
         directories
