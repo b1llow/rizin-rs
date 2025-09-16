@@ -27,22 +27,25 @@
         inherit (bpkgs) rizin;
 
         rizin-rs = pkgs.rustPlatform.buildRustPackage rec {
-            pname = "rizin-rs";
-            version = "0.9.0";
-            src = ./.;
+          pname = "rizin-rs";
+          version = "0.9.0";
+          src = ./.;
 
-            cargoLock.lockFile = ./Cargo.lock;
+          cargoLock.lockFile = ./Cargo.lock;
 
-            cargoHash = "";
+          cargoHash = "";
 
-            buildInputs = [ rizin ];
+          buildInputs = [
+            rizin
+            pkgs.llvmPackages_18.libclang
+          ];
 
-            doCheck = false;
+          doCheck = false;
 
-            preConfigure = ''
-              export RIZIN_DIR=${rizin}
-            '';
-          };
+          preConfigure = ''
+            export RIZIN_DIR=${rizin}
+          '';
+        };
       in
       {
         formatter = nixfmt-tree;
