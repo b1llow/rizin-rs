@@ -26,6 +26,7 @@
           lib
           nixfmt-tree
           rustPlatform
+          pkg-config
           llvmPackages_18
           mkShell
           rust-analyzer
@@ -35,7 +36,6 @@
         inherit (bpkgs) rizin;
 
         env = {
-          RIZIN_DIR = "${rizin}";
           LIBCLANG_PATH = "${llvmPackages_18.libclang.lib}/lib";
         };
 
@@ -46,9 +46,12 @@
             version = "0.9.0";
             src = ./.;
 
-            cargoHash = "sha256-ELLaVzhO10+ZNQRud92Q/WF3vi8RGhycw3OKPMwhGGs=";
+            cargoHash = "sha256-7R8qH1D1UuHfU5bDRokeDu6pSDV6lKIZY0Fzjr4O3Cw=";
 
-            nativeBuildInputs = [ rustPlatform.bindgenHook ];
+            nativeBuildInputs = [
+              rustPlatform.bindgenHook
+              pkg-config
+            ];
             buildInputs = [
               rizin
               llvmPackages_18.libclang

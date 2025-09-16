@@ -12,6 +12,7 @@ exclude = ["rizin/*", "flake.*"]
 bindgen = "0.69.4"
 glob = "0.3"
 itertools = "0.12.1"
+pkg-config = "0.3.32"
 
 [profile.dev]
 rpath = true
