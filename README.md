@@ -23,6 +23,21 @@ rizin-rs is a Rust library that provides bindings to the [Rizin](https://github.
 cargo add rizin-rs
 ```
 
+```nix
+rustPlatform.buildRustPackage {
+    ...
+    LIBCLANG_PATH = "${llvmPackages_18.libclang.lib}/lib";
+    nativeBuildInputs = [
+      rustPlatform.bindgenHook
+      pkg-config
+    ];
+    buildInputs = [
+      rizin
+      llvmPackages_18.libclang
+    ];
+}
+```
+
 ## Usage
 
 TODO
