@@ -1,0 +1,17 @@
+[package]
+name = "rizin-rs"
+version = "0.1.0"
+edition = "2024"
+
+[[bench]]
+name = "my_benchmark"
+harness = false
+
+[dependencies]
+anyhow = "1.0.86"
+libc = "0.2.155"
+rizin-sys = { version = "0.9.1", path = "../rizin-sys" }
+
+[dev-dependencies]
+criterion = { version = "0.7.0", features = ["html_reports"] }
+rand = "0.9.2"
