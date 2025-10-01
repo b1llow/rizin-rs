@@ -1,3 +1,4 @@
+use rizin_sys::rz_iterator_next;
 use std::ffi::CStr;
 use std::fmt::Display;
 use std::marker::PhantomData;
@@ -5,6 +6,50 @@ use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{NonNull, addr_of, addr_of_mut, null_mut};
 use std::{fmt, slice};
+
+pub struct RzIterator<'a, T: 'a> {
+    pub inner: NonNull<rizin_sys::RzIterator>,
+    marker: PhantomData<&'a T>,
+}
+
+impl<'a, T: 'a> Iterator for RzIterator<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unsafe {
+            let nptr = rz_iterator_next(self.inner.as_mut());
+            if nptr.is_null() {
+                None
+            } else {
+                (nptr as *const T).as_ref()
+            }
+        }
+    }
+}
+
+impl<T> Drop for RzIterator<'_, T> {
+    fn drop(&mut self) {
+        unsafe {
+            let inner = self.inner.as_ref();
+            inner.free.map(|ff| ff(inner.cur));
+            inner.free_u.map(|ff| ff(inner.u));
+        }
+    }
+}
+
+impl<T> RzIterator<'_, T> {
+    pub fn from_raw(raw: *mut rizin_sys::RzIterator) -> Self {
+        Self {
+            inner: NonNull::new(raw).expect("null ptr"),
+            marker: PhantomData,
+        }
+    }
+    pub fn into_raw(self) -> *mut rizin_sys::RzIterator {
+        let ptr = self.inner;
+        std::mem::forget(self);
+        ptr.as_ptr()
+    }
+}
 
 pub struct RzStrBuf(pub rizin_sys::RzStrBuf);
 
@@ -315,9 +360,11 @@ impl<T> DerefMut for RzPVector<T> {
 #[cfg(test)]
 mod tests {
     use crate::RzCore;
-    use crate::util::{RzList, RzPVector, RzVector};
+    use crate::util::{RzIterator, RzList, RzPVector, RzVector};
     use crate::*;
-    use std::ptr::addr_of;
+    use rizin_sys::rz_iterator_new;
+    use std::ffi::c_void;
+    use std::ptr::{addr_of, null_mut};
     use std::vec;
 
     #[test]
@@ -355,6 +402,43 @@ mod tests {
             list.push(i);
         }
         let act: Vec<i32> = list.iter().map(|x| *x).collect();
+        assert_eq!(act, (0..10).into_iter().collect::<Vec<i32>>());
+    }
+
+    #[test]
+    fn test_iter() {
+        unsafe extern "C" fn iter_n(x: *mut rizin_sys::RzIterator) -> *mut std::os::raw::c_void {
+            unsafe {
+                let x = &mut *x;
+                let y: Box<i32> = Box::from_raw(x.u as _);
+                if *y < 10 {
+                    let ny = Box::new(*y + 1);
+                    x.u = Box::into_raw(ny) as _;
+                    Box::into_raw(y) as _
+                } else {
+                    x.u = null_mut();
+                    null_mut()
+                }
+            }
+        }
+        unsafe extern "C" fn free_box(x: *mut c_void) {
+            unsafe {
+                if !x.is_null() {
+                    drop(Box::from_raw(x));
+                }
+            }
+        }
+
+        let data = Box::new(0);
+        let iter: RzIterator<i32> = RzIterator::from_raw(unsafe {
+            rz_iterator_new(
+                Some(iter_n),
+                Some(free_box),
+                Some(free_box),
+                Box::into_raw(data) as _,
+            )
+        });
+        let act: Vec<i32> = iter.map(|x| *x).collect();
         assert_eq!(act, (0..10).into_iter().collect::<Vec<i32>>());
     }
 }
