@@ -56,7 +56,7 @@
               llvmPackages_18.libclang
             ];
 
-            doCheck = false;
+            doCheck = true;
 
             preConfigure = ''
 
