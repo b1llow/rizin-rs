@@ -1,13 +1,15 @@
+#![allow(dead_code)]
+
 use core::str;
+use rizin_sys::*;
 use std::ffi::{CStr, CString};
 use std::fmt::Display;
 use std::marker::PhantomData;
-use std::mem::{size_of, ManuallyDrop};
+use std::mem::{ManuallyDrop, size_of};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::ptr::{addr_of, addr_of_mut, null_mut, NonNull};
+use std::ptr::{NonNull, addr_of, addr_of_mut, null_mut};
 use std::{fmt, result, slice};
-use rizin_sys::*;
 
 use anyhow::anyhow;
 
@@ -46,7 +48,7 @@ impl StrBuf {
 }
 
 impl Display for StrBuf {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> result::Result<(), fmt::Error> {
         let cptr = unsafe { rz_strbuf_drain_nofree(addr_of!(self.0) as _) };
         if cptr.is_null() {
             Ok(())
@@ -97,7 +99,12 @@ impl Core {
         Self(NonNull::new(core).unwrap())
     }
 
-    pub fn analysis_op(&self, bytes: &[u8], addr: usize) -> Result<AnalysisOp> {
+    pub fn analysis_op(
+        &self,
+        bytes: &[u8],
+        addr: usize,
+        mask: RzAnalysisOpMask,
+    ) -> Result<AnalysisOp> {
         let mut op: AnalysisOp = AnalysisOp(Default::default());
         let res = unsafe {
             rz_analysis_op(
@@ -106,8 +113,7 @@ impl Core {
                 addr as _,
                 bytes.as_ptr() as _,
                 bytes.len() as _,
-                RzAnalysisOpMask_RZ_ANALYSIS_OP_MASK_DISASM
-                    | RzAnalysisOpMask_RZ_ANALYSIS_OP_MASK_IL,
+                mask,
             )
         };
         if res <= 0 {
@@ -117,7 +123,7 @@ impl Core {
         }
     }
 
-    pub fn set(&self, k: &str, v: &str) -> Result<&Self> {
+    pub fn config_set(&self, k: &str, v: &str) -> Result<&Self> {
         let node = unsafe {
             rz_config_set(
                 self.0.as_ref().config,
@@ -129,6 +135,17 @@ impl Core {
             .map(|_| self)
             .ok_or(anyhow!("{} is null", k))
     }
+
+    pub fn config_get(&self, k: &str) -> Result<&CStr> {
+        let cstr = unsafe {
+            let ptr = rz_config_get(self.0.as_ref().config, CString::new(k)?.as_ptr());
+            if ptr.is_null() {
+                return Err(anyhow!("{} is null", k));
+            }
+            CStr::from_ptr(ptr)
+        };
+        Ok(cstr)
+    }
 }
 
 pub struct BinFile<'a> {
@@ -136,16 +153,19 @@ pub struct BinFile<'a> {
     pub bf: NonNull<RzBinFile>,
 }
 
-impl Core {
-    unsafe fn open(&mut self, path: PathBuf) -> Result<BinFile> {
+impl<'a> Core {
+    fn bin_open(&'a mut self, path: PathBuf) -> Result<BinFile<'a>> {
         let mut rz_bin_opt = RzBinOptions::default();
-        rz_bin_options_init(&mut rz_bin_opt, 0, 0, 0, false);
+        unsafe {
+            rz_bin_options_init(&mut rz_bin_opt, 0, 0, 0, false);
+        }
         let cpath = CString::new(path.to_str().unwrap()).unwrap();
-        let bf = rz_bin_open(self.0.as_ref().bin, cpath.as_ptr(), &mut rz_bin_opt);
-        Ok(BinFile {
+        let bf = unsafe { rz_bin_open(self.0.as_ref().bin, cpath.as_ptr(), &mut rz_bin_opt) };
+        let bf = BinFile {
             core: self,
             bf: NonNull::new(bf).ok_or(anyhow!("failed open {}", path.to_str().unwrap()))?,
-        })
+        };
+        Ok(bf)
     }
 }
 
@@ -161,10 +181,17 @@ pub struct DwarfAbbrev(pub NonNull<RzBinDwarfAbbrev>);
 
 impl DwarfAbbrev {
     pub fn new(input: &[u8]) -> Result<DwarfAbbrev> {
-        let R = RzBinEndianReader::new(input, false);
+        let reader = RzBinEndianReader {
+            data: input.as_ptr() as _,
+            owned: false,
+            length: input.len() as _,
+            offset: 0,
+            big_endian: false,
+            relocations: null_mut(),
+        };
         let abbrev = unsafe {
             let ptr = libc::malloc(size_of::<RzBinEndianReader>());
-            libc::memcpy(ptr, addr_of!(R) as _, size_of::<RzBinEndianReader>());
+            libc::memcpy(ptr, addr_of!(reader) as _, size_of::<RzBinEndianReader>());
             rz_bin_dwarf_abbrev_new(ptr as _)
         };
         NonNull::<RzBinDwarfAbbrev>::new(abbrev)
@@ -189,11 +216,38 @@ pub struct List<T> {
 pub struct ListIter<'a, T: 'a> {
     head: Option<NonNull<RzListIter>>,
     tail: Option<NonNull<RzListIter>>,
-    len: usize,
+    lst: &'a List<T>,
     marker: PhantomData<&'a T>,
 }
 
 impl<T> List<T> {
+    pub fn new() -> Self {
+        let x = unsafe { rz_list_new() };
+        Self::try_from(x).unwrap()
+    }
+
+    pub fn push(&mut self, value: T) {
+        unsafe {
+            let val = Box::new(value);
+            rz_list_push(self.inner.as_ptr(), Box::into_raw(val) as _);
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<Box<T>> {
+        if self.len() == 0 {
+            None
+        } else {
+            let mut value: *mut T = unsafe { std::mem::zeroed() };
+            unsafe {
+                let v = rz_list_pop(self.inner.as_ptr());
+                if !v.is_null() {
+                    value = v as *mut T;
+                }
+            }
+            Some(unsafe { Box::from_raw(value) })
+        }
+    }
+
     pub fn len(&self) -> usize {
         unsafe { rz_list_length(self.inner.as_ptr()) as _ }
     }
@@ -203,7 +257,7 @@ impl<T> List<T> {
             ListIter {
                 head: NonNull::new(self.inner.as_ref().head),
                 tail: NonNull::new(self.inner.as_ref().tail),
-                len: self.len(),
+                lst: self,
                 marker: PhantomData,
             }
         }
@@ -231,38 +285,31 @@ impl<T> Drop for List<T> {
 }
 
 impl<'a, T> Iterator for ListIter<'a, T> {
-    type Item = *mut T;
+    type Item = Box<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.len == 0 {
-            None
-        } else {
-            self.head.map(|node| unsafe {
-                let item = node.as_ref().elem as Self::Item;
-                self.len -= 1;
-                self.head = NonNull::new(rz_list_iter_get_next(node.as_ptr()));
-                item
-            })
-        }
+        self.head.map(|node| unsafe {
+            let it = rz_list_iter_get_next(node.as_ptr());
+            let item = node.as_ref().elem as *mut T;
+            self.head = NonNull::new(it);
+            Box::from_raw(item)
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len, Some(self.len))
+        let len = unsafe { rz_list_length(self.lst.inner.as_ptr()) };
+        (len as _, Some(len as _))
     }
 }
 
 impl<'a, T> DoubleEndedIterator for ListIter<'a, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        if self.len == 0 {
-            None
-        } else {
-            self.tail.map(|node| unsafe {
-                let item = node.as_ref().elem as Self::Item;
-                self.len -= 1;
-                self.head = NonNull::new(rz_list_iter_get_prev(node.as_ptr()));
-                item
-            })
-        }
+        self.tail.map(|node| unsafe {
+            let it = rz_list_iter_get_prev(node.as_ptr());
+            let item = node.as_ref().elem as *mut T;
+            self.head = NonNull::new(it);
+            Box::from_raw(item)
+        })
     }
 }
 
@@ -272,6 +319,65 @@ pub struct Vector<T> {
 }
 
 impl<T> Vector<T> {
+    fn from_raw(value: *mut RzVector) -> Option<Self> {
+        Some(Self {
+            inner: NonNull::new(value)?,
+            marker: PhantomData,
+        })
+    }
+    fn into_raw(self) -> *mut RzVector {
+        let ptr = self.inner.as_ptr();
+        std::mem::forget(self);
+        ptr
+    }
+
+    pub fn new(len: usize) -> Self {
+        let x = unsafe {
+            let vec = rz_vector_new(size_of::<T>(), None, null_mut());
+            rz_vector_reserve(vec, len);
+            vec
+        };
+        Self::from_raw(x).unwrap()
+    }
+
+    pub fn push(&mut self, value: T) {
+        unsafe {
+            rz_vector_push(self.inner.as_mut(), addr_of!(value) as _);
+            std::mem::forget(value);
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        if self.len() == 0 {
+            None
+        } else {
+            let mut value: T = unsafe { std::mem::zeroed() };
+            unsafe {
+                rz_vector_pop(self.inner.as_mut(), addr_of_mut!(value) as _);
+            }
+            Some(value)
+        }
+    }
+
+    pub fn insert(&mut self, index: usize, value: T) {
+        unsafe {
+            rz_vector_insert(self.inner.as_mut(), index as _, addr_of!(value) as _);
+            std::mem::forget(value);
+        }
+    }
+
+    pub fn remove(&mut self, index: usize) -> Option<T> {
+        if index >= self.len() {
+            None
+        } else {
+            let mut value: T = unsafe { std::mem::zeroed() };
+            unsafe {
+                rz_vector_remove_at(self.inner.as_mut(), index as _, addr_of_mut!(value) as _);
+            }
+            Some(value)
+        }
+    }
+
     pub fn as_mut_ptr(&self) -> *mut T {
         unsafe { self.inner.as_ref().a as _ }
     }
@@ -281,14 +387,13 @@ impl<T> Vector<T> {
     }
 }
 
-impl<T> TryFrom<*mut RzVector> for Vector<T> {
+impl<T> TryFrom<Vec<T>> for Vector<T> {
     type Error = ();
 
-    fn try_from(value: *mut RzVector) -> result::Result<Self, Self::Error> {
-        Ok(Self {
-            inner: NonNull::new(value).ok_or(())?,
-            marker: PhantomData,
-        })
+    fn try_from(value: Vec<T>) -> result::Result<Self, Self::Error> {
+        let mut vec = Vector::new(value.len());
+        value.into_iter().for_each(|x| vec.push(x));
+        Ok(vec)
     }
 }
 
@@ -326,17 +431,21 @@ pub struct PVector<T> {
     marker: PhantomData<T>,
 }
 
-impl<T> TryFrom<*mut RzPVector> for PVector<T> {
-    type Error = ();
-
-    fn try_from(value: *mut RzPVector) -> result::Result<Self, Self::Error> {
-        let inner = NonNull::new(value).ok_or(())?;
-        let v = unsafe { Vector::try_from(addr_of_mut!((*value).v))? };
-        Ok(Self {
-            inner,
-            v: ManuallyDrop::new(v),
-            marker: PhantomData,
+impl<T> PVector<T> {
+    fn from_raw(value: *mut RzPVector) -> Option<Self> {
+        NonNull::new(value).and_then(|inner| {
+            let v = unsafe { Vector::from_raw(addr_of_mut!((*inner.as_ptr()).v))? };
+            Some(Self {
+                inner,
+                v: ManuallyDrop::new(v),
+                marker: PhantomData,
+            })
         })
+    }
+    fn into_raw(self) -> *mut RzPVector {
+        let ptr = self.inner.as_ptr();
+        std::mem::forget(self);
+        ptr
     }
 }
 
@@ -370,9 +479,9 @@ impl<T> DerefMut for PVector<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::mem::size_of;
-
-    use crate::wrapper::*;
+    use crate::*;
+    use crate::{Core, List, PVector, Vector};
+    use std::vec;
 
     #[test]
     fn test_core() {
@@ -381,13 +490,7 @@ mod tests {
 
     #[test]
     fn test_vector() {
-        let vec = unsafe {
-            let x = rz_vector_new(size_of::<i32>(), None, null_mut());
-            for i in 0..10 {
-                rz_vector_push(x, addr_of!(i) as _);
-            }
-            Vector::<i32>::try_from(x).unwrap()
-        };
+        let vec = Vector::try_from(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).unwrap();
         assert_eq!(
             vec.iter().map(|x| *x).collect::<Vec<i32>>(),
             (0..10).into_iter().collect::<Vec<i32>>()
@@ -400,25 +503,21 @@ mod tests {
             for i in 0..10 {
                 rz_vector_push(addr_of_mut!((*x).v), addr_of!(i) as _);
             }
-            PVector::<i32>::try_from(x).unwrap()
+            PVector::<i32>::from_raw(x).unwrap()
         };
         assert_eq!(
             vec.iter().map(|x| *x as i32).collect::<Vec<i32>>(),
             (0..10).into_iter().collect::<Vec<i32>>()
         );
     }
+
     #[test]
     fn test_list() {
-        let list = unsafe {
-            let x = rz_list_new();
-            for i in 0..10 {
-                rz_list_push(x, i as _);
-            }
-            List::<i32>::try_from(x).unwrap()
-        };
-        assert_eq!(
-            list.iter().map(|x| x as i32).collect::<Vec<i32>>(),
-            (0..10).into_iter().collect::<Vec<i32>>()
-        );
+        let mut list = List::new();
+        for i in 0..10 {
+            list.push(i);
+        }
+        let act: Vec<i32> = list.iter().map(|x| *x).collect();
+        assert_eq!(act, (0..10).into_iter().collect::<Vec<i32>>());
     }
 }

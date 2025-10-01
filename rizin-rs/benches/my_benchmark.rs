@@ -1,9 +1,9 @@
 use std::fmt::{Display, Formatter};
 
-use criterion::{black_box, criterion_group, criterion_main, Bencher, BenchmarkId, Criterion};
+use criterion::{Bencher, BenchmarkId, Criterion, criterion_group, criterion_main};
 use rand::prelude::*;
 
-use rizin_rs::wrapper::Core;
+use rizin_rs::Core;
 
 struct Input<'a> {
     arch: Option<&'a str>,
@@ -21,14 +21,15 @@ impl<'a> Display for Input<'a> {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut rng = rand::thread_rng();
-    let data = (0..128).map(|_| rng.gen::<u32>()).collect::<Vec<_>>();
+    let mut rng = rand::rng();
+    let data = (0..128).map(|_| rng.next_u32()).collect::<Vec<_>>();
     let core = Core::new();
 
     let mut f = |inp: Input| {
         inp.arch
-            .map(|arch| core.set("analysis.arch", arch).unwrap());
-        inp.cpu.map(|cpu| core.set("analysis.cpu", cpu).unwrap());
+            .map(|arch| core.config_set("analysis.arch", arch).unwrap());
+        inp.cpu
+            .map(|cpu| core.config_set("analysis.cpu", cpu).unwrap());
 
         c.bench_with_input(
             BenchmarkId::new("analysis_op", &inp),
@@ -37,7 +38,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                 b.iter(|| {
                     for x in i {
                         let b = x.to_le_bytes();
-                        let _ = black_box(core.analysis_op(&b, 0));
+                        let _ = std::hint::black_box(core.analysis_op(
+                            &b,
+                            0,
+                            rizin_sys::RzAnalysisOpMask_RZ_ANALYSIS_OP_MASK_DISASM
+                                | rizin_sys::RzAnalysisOpMask_RZ_ANALYSIS_OP_MASK_IL,
+                        ));
                     }
                 })
             },
