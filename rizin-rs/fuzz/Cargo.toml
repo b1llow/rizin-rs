@@ -19,27 +19,3 @@ members = ["."]
 
 [profile.release]
 debug = 1
-
-[[bin]]
-name = "debug_abbrev"
-path = "fuzz_targets/debug_abbrev.rs"
-test = false
-doc = false
-
-#[[bin]]
-#name = "debug_info"
-#path = "fuzz_targets/debug_info.rs"
-#test = false
-#doc = false
-
-#[[bin]]
-#name = "debug_line"
-#path = "fuzz_targets/debug_line.rs"
-#test = false
-#doc = false
-#
-#[[bin]]
-#name = "debug_aranges"
-#path = "fuzz_targets/debug_aranges.rs"
-#test = false
-#doc = false
