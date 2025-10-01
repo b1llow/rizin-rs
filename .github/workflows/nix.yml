@@ -83,4 +83,4 @@ jobs:
           nix fmt -- --ci .
       - name: Check cargo formatting
         run: |
-          nix develop . -c cargo fmt --check
+          nix develop .#fmt -c cargo fmt --check

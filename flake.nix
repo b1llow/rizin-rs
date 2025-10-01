@@ -89,6 +89,11 @@
               RUST_SRC_PATH = "${rustPlatform.rustLibSrc}";
             }
           );
+          fmt = mkShell {
+            packages = [
+              rustPlatform.rust.cargo
+            ];
+          };
         };
 
       }
