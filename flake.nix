@@ -45,8 +45,7 @@
             pname = "rizin-rs";
             version = "0.9.1";
             src = ./.;
-
-            cargoHash = "sha256-MGc5nPdTvEqLvZ8ute0O3SH5D9dlvj1yOLNfu3ADgrM=";
+            cargoLock.lockFile = ./Cargo.lock;
 
             nativeBuildInputs = [
               rustPlatform.bindgenHook
