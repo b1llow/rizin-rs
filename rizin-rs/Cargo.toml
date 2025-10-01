@@ -9,7 +9,6 @@ harness = false
 
 [dependencies]
 anyhow = "1.0.86"
-libc = "0.2.155"
 rizin-sys = { version = "0.9.1", path = "../rizin-sys" }
 
 [dev-dependencies]

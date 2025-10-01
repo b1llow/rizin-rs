@@ -1,54 +1,10 @@
 use crate::common::search_libs;
-use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
-use std::collections::HashSet;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 
 #[path = "build/common.rs"]
 pub mod common;
-
-const IGNORE_MACROS: [&str; 20] = [
-    "FE_DIVBYZERO",
-    "FE_DOWNWARD",
-    "FE_INEXACT",
-    "FE_INVALID",
-    "FE_OVERFLOW",
-    "FE_TONEAREST",
-    "FE_TOWARDZERO",
-    "FE_UNDERFLOW",
-    "FE_UPWARD",
-    "FP_INFINITE",
-    "FP_INT_DOWNWARD",
-    "FP_INT_TONEAREST",
-    "FP_INT_TONEARESTFROMZERO",
-    "FP_INT_TOWARDZERO",
-    "FP_INT_UPWARD",
-    "FP_NAN",
-    "FP_NORMAL",
-    "FP_SUBNORMAL",
-    "FP_ZERO",
-    "IPPORT_RESERVED",
-];
-
-#[derive(Debug)]
-struct IgnoreMacros(HashSet<String>);
-
-impl ParseCallbacks for IgnoreMacros {
-    fn will_parse_macro(&self, name: &str) -> MacroParsingBehavior {
-        if self.0.contains(name) {
-            MacroParsingBehavior::Ignore
-        } else {
-            MacroParsingBehavior::Default
-        }
-    }
-}
-
-impl IgnoreMacros {
-    fn new() -> Self {
-        Self(IGNORE_MACROS.into_iter().map(|s| s.to_owned()).collect())
-    }
-}
 
 const RZ_LIBRARIES: &[&str] = &[
     "rz_arch",
@@ -119,15 +75,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let bindings = builder
         .derive_default(true)
+        .derive_hash(true)
+        .derive_eq(true)
         .generate_inline_functions(true)
+        .prepend_enum_name(false)
+        .array_pointers_in_arguments(true)
+        .merge_extern_blocks(true)
+        //.c_naming(true)
         .header("wrapper.h")
         .allowlist_type("rz_.*")
         .allowlist_type("Rz.*")
         .allowlist_function("rz_.*")
-        .allowlist_var("RZ_.*")
+        .allowlist_var("rz.*")
+        .allowlist_var("RZ.*")
         .clang_arg("-fparse-all-comments")
         .clang_arg("-std=c99")
-        .parse_callbacks(Box::new(IgnoreMacros::new()))
         .generate()
         .expect("Unable to generate bindings");
 

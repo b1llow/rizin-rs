@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use criterion::{Bencher, BenchmarkId, Criterion, criterion_group, criterion_main};
 use rand::prelude::*;
 
-use rizin_rs::Core;
+use rizin_rs::RzCore;
 
 struct Input<'a> {
     arch: Option<&'a str>,
@@ -23,9 +23,9 @@ impl<'a> Display for Input<'a> {
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rng = rand::rng();
     let data = (0..128).map(|_| rng.next_u32()).collect::<Vec<_>>();
-    let core = Core::new();
+    let core = RzCore::new();
 
-    let mut f = |inp: Input| {
+    let mut bench_analysis_op = |inp: Input| {
         inp.arch
             .map(|arch| core.config_set("analysis.arch", arch).unwrap());
         inp.cpu
@@ -41,8 +41,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                         let _ = std::hint::black_box(core.analysis_op(
                             &b,
                             0,
-                            rizin_sys::RzAnalysisOpMask_RZ_ANALYSIS_OP_MASK_DISASM
-                                | rizin_sys::RzAnalysisOpMask_RZ_ANALYSIS_OP_MASK_IL,
+                            rizin_sys::RZ_ANALYSIS_OP_MASK_DISASM
+                                | rizin_sys::RZ_ANALYSIS_OP_MASK_IL,
                         ));
                     }
                 })
@@ -50,21 +50,25 @@ fn criterion_benchmark(c: &mut Criterion) {
         );
     };
 
-    f(Input {
+    bench_analysis_op(Input {
         arch: None,
         cpu: None,
     });
-    f(Input {
+    bench_analysis_op(Input {
         arch: Some("pic"),
         cpu: Some("pic16"),
     });
-    f(Input {
+    bench_analysis_op(Input {
         arch: Some("pic"),
         cpu: Some("pic18"),
     });
-    f(Input {
+    bench_analysis_op(Input {
         arch: Some("tricore"),
         cpu: None,
+    });
+    bench_analysis_op(Input {
+        arch: Some("h8300"),
+        cpu: Some("h8300"),
     });
 }
 
