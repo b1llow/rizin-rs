@@ -97,9 +97,22 @@ pub struct RzListIter<'a, T: 'a> {
 }
 
 impl<T> RzList<T> {
+    fn from_raw(value: *mut rizin_sys::RzList) -> Option<Self> {
+        NonNull::new(value).map(|inner| Self {
+            inner,
+            marker: PhantomData,
+        })
+    }
+
+    fn into_raw(self) -> *mut rizin_sys::RzList {
+        let ptr = self.inner.as_ptr();
+        std::mem::forget(self);
+        ptr
+    }
+
     pub fn new() -> Self {
         let x = unsafe { rizin_sys::rz_list_new() };
-        Self::try_from(x).unwrap()
+        Self::from_raw(x).expect("null ptr")
     }
 
     pub fn push(&mut self, value: T) {
@@ -140,18 +153,6 @@ impl<T> RzList<T> {
     }
 }
 
-impl<T> TryFrom<*mut rizin_sys::RzList> for RzList<T> {
-    type Error = ();
-
-    fn try_from(value: *mut rizin_sys::RzList) -> Result<Self, Self::Error> {
-        let inner = NonNull::new(value).unwrap();
-        Ok(Self {
-            inner,
-            marker: PhantomData,
-        })
-    }
-}
-
 impl<T> Drop for RzList<T> {
     fn drop(&mut self) {
         unsafe {
@@ -161,15 +162,16 @@ impl<T> Drop for RzList<T> {
 }
 
 impl<'a, T> Iterator for RzListIter<'a, T> {
-    type Item = Box<T>;
+    type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.head.map(|node| unsafe {
-            let it = rizin_sys::rz_list_iter_get_next(node.as_ptr());
-            let item = node.as_ref().elem as *mut T;
-            self.head = NonNull::new(it);
-            Box::from_raw(item)
-        })
+        self.head
+            .map(|node| unsafe {
+                let it = rizin_sys::rz_list_iter_get_next(node.as_ptr());
+                self.head = NonNull::new(it);
+                (node.as_ref().elem as *mut T).as_ref()
+            })
+            .flatten()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -180,12 +182,13 @@ impl<'a, T> Iterator for RzListIter<'a, T> {
 
 impl<'a, T> DoubleEndedIterator for RzListIter<'a, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.tail.map(|node| unsafe {
-            let it = rizin_sys::rz_list_iter_get_prev(node.as_ptr());
-            let item = node.as_ref().elem as *mut T;
-            self.head = NonNull::new(it);
-            Box::from_raw(item)
-        })
+        self.tail
+            .map(|node| unsafe {
+                let it = rizin_sys::rz_list_iter_get_prev(node.as_ptr());
+                self.tail = NonNull::new(it);
+                (node.as_ref().elem as *mut T).as_ref()
+            })
+            .flatten()
     }
 }
 
@@ -362,7 +365,7 @@ mod tests {
     use crate::RzCore;
     use crate::util::{RzIterator, RzList, RzPVector, RzVector};
     use crate::*;
-    use rizin_sys::rz_iterator_new;
+    use rizin_sys::{rz_iterator_new, rz_list_newf};
     use std::ffi::c_void;
     use std::ptr::{addr_of, null_mut};
     use std::vec;
@@ -370,6 +373,14 @@ mod tests {
     #[test]
     fn test_core() {
         let _ = RzCore::new();
+    }
+
+    unsafe extern "C" fn free_box(x: *mut c_void) {
+        unsafe {
+            if !x.is_null() {
+                drop(Box::from_raw(x));
+            }
+        }
     }
 
     #[test]
@@ -397,12 +408,14 @@ mod tests {
 
     #[test]
     fn test_list() {
-        let mut list = RzList::new();
+        let mut list = RzList::from_raw(unsafe { rz_list_newf(Some(free_box)) }).unwrap();
         for i in 0..10 {
             list.push(i);
         }
         let act: Vec<i32> = list.iter().map(|x| *x).collect();
         assert_eq!(act, (0..10).into_iter().collect::<Vec<i32>>());
+        let rev: Vec<i32> = list.iter().rev().map(|x| *x).collect();
+        assert_eq!(rev, (0..10).rev().into_iter().collect::<Vec<i32>>());
     }
 
     #[test]
@@ -418,13 +431,6 @@ mod tests {
                 } else {
                     x.u = null_mut();
                     null_mut()
-                }
-            }
-        }
-        unsafe extern "C" fn free_box(x: *mut c_void) {
-            unsafe {
-                if !x.is_null() {
-                    drop(Box::from_raw(x));
                 }
             }
         }
