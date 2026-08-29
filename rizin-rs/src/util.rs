@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};
-use std::ptr::{addr_of, addr_of_mut, null_mut, NonNull};
+use std::ptr::{NonNull, addr_of, addr_of_mut, null_mut};
 use std::{fmt, slice};
 
 pub struct RzIterator<'a, T: 'a> {
@@ -362,8 +362,8 @@ impl<T> DerefMut for RzPVector<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::{RzIterator, RzList, RzPVector, RzVector};
     use crate::RzCore;
+    use crate::util::{RzIterator, RzList, RzPVector, RzVector};
     use crate::*;
     use rizin_sys::{rz_iterator_new, rz_list_newf};
     use std::ffi::c_void;
