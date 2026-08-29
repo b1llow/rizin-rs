@@ -38,6 +38,28 @@ rustPlatform.buildRustPackage {
 }
 ```
 
+## Nix packages
+
+The flake provides both the Rust bindings and the pinned Rizin build:
+
+```bash
+nix build .#rizin-rs
+nix build .#rizin
+```
+
+Rizin is pinned to a specific commit from its `dev` branch. Update it to the
+latest `dev` revision, including the source and Meson dependency hashes, with:
+
+```bash
+./nix/rizin/update.sh
+```
+
+Pass a full 40-character commit SHA to pin a specific revision instead:
+
+```bash
+./nix/rizin/update.sh <commit>
+```
+
 ## Usage
 
 TODO

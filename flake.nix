@@ -4,10 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    b = {
-      url = "github:b1llow/nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -15,7 +11,6 @@
       self,
       nixpkgs,
       flake-utils,
-      b,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -23,53 +18,28 @@
       let
         pkgs = import nixpkgs { inherit system; };
         inherit (pkgs)
-          lib
           nixfmt-tree
           rustPlatform
-          pkg-config
           llvmPackages_18
           mkShell
           rust-analyzer
+          rustfmt
           cargo-watch
           ;
-        bpkgs = b.packages.${system};
-        inherit (bpkgs) rizin;
+
+        rizin = pkgs.callPackage ./nix/rizin { };
+        rizin-rs = pkgs.callPackage ./nix/rizin-rs { inherit rizin; };
 
         env = {
           LIBCLANG_PATH = "${llvmPackages_18.libclang.lib}/lib";
         };
-
-        rizin-rs = rustPlatform.buildRustPackage (
-          env
-          // rec {
-            pname = "rizin-rs";
-            version = "0.9.1";
-            src = ./.;
-            cargoLock.lockFile = ./Cargo.lock;
-
-            nativeBuildInputs = [
-              rustPlatform.bindgenHook
-              pkg-config
-            ];
-            buildInputs = [
-              rizin
-              llvmPackages_18.libclang
-            ];
-
-            doCheck = true;
-
-            preConfigure = ''
-
-            '';
-          }
-        );
       in
       {
         formatter = nixfmt-tree;
 
         packages = {
           default = rizin-rs;
-          inherit rizin-rs;
+          inherit rizin rizin-rs;
         };
 
         devShells = {
@@ -92,6 +62,7 @@
           fmt = mkShell {
             packages = [
               rustPlatform.rust.cargo
+              rustfmt
             ];
           };
         };

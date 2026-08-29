@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};
-use std::ptr::{NonNull, addr_of, addr_of_mut, null_mut};
+use std::ptr::{addr_of, addr_of_mut, null_mut, NonNull};
 use std::{fmt, slice};
 
 pub struct RzIterator<'a, T: 'a> {
@@ -167,9 +167,9 @@ impl<'a, T> Iterator for RzListIter<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         self.head
             .map(|node| unsafe {
-                let it = rizin_sys::rz_list_iter_get_next(node.as_ptr());
+                let it = node.as_ref().next;
                 self.head = NonNull::new(it);
-                (node.as_ref().elem as *mut T).as_ref()
+                (node.as_ref().val as *mut T).as_ref()
             })
             .flatten()
     }
@@ -184,9 +184,9 @@ impl<'a, T> DoubleEndedIterator for RzListIter<'a, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.tail
             .map(|node| unsafe {
-                let it = rizin_sys::rz_list_iter_get_prev(node.as_ptr());
+                let it = node.as_ref().prev;
                 self.tail = NonNull::new(it);
-                (node.as_ref().elem as *mut T).as_ref()
+                (node.as_ref().val as *mut T).as_ref()
             })
             .flatten()
     }
@@ -362,8 +362,8 @@ impl<T> DerefMut for RzPVector<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::RzCore;
     use crate::util::{RzIterator, RzList, RzPVector, RzVector};
+    use crate::RzCore;
     use crate::*;
     use rizin_sys::{rz_iterator_new, rz_list_newf};
     use std::ffi::c_void;
