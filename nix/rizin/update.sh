@@ -39,9 +39,20 @@ source_url="https://github.com/rizinorg/rizin/archive/$rev.tar.gz"
 echo "Prefetching Rizin source at $rev"
 prefetch_json=$(nix store prefetch-file --json --unpack "$source_url")
 src_hash=$(printf '%s\n' "$prefetch_json" | sed -n 's/.*"hash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+source_path=$(printf '%s\n' "$prefetch_json" | sed -n 's/.*"storePath"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 
 if [[ $src_hash != sha256-* ]]; then
     echo "Could not extract the Rizin source hash from: $prefetch_json" >&2
+    exit 1
+fi
+if [[ ! -d $source_path ]]; then
+    echo "Could not extract the unpacked Rizin source path from: $prefetch_json" >&2
+    exit 1
+fi
+
+upstream_version=$(sed -n "s/^[[:space:]]*version: 'v\([^']*\)',/\1/p" "$source_path/meson.build" | head -n 1)
+if [[ ! $upstream_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Could not extract a three-part Rizin version from $source_path/meson.build" >&2
     exit 1
 fi
 
@@ -59,17 +70,18 @@ restore_on_error() {
 trap restore_on_error EXIT
 
 write_checksums() {
-    target_rev=$1
-    target_src_hash=$2
-    target_deps_hash=$3
+    target_version=$1
+    target_rev=$2
+    target_src_hash=$3
+    target_deps_hash=$4
     tmp=$(mktemp "${checksum_file}.tmp.XXXXXX")
-    printf '{\n  "rev": "%s",\n  "srcHash": "%s",\n  "mesonDepsHash": "%s"\n}\n' \
-        "$target_rev" "$target_src_hash" "$target_deps_hash" >"$tmp"
+    printf '{\n  "version": "%s",\n  "rev": "%s",\n  "srcHash": "%s",\n  "mesonDepsHash": "%s"\n}\n' \
+        "$target_version" "$target_rev" "$target_src_hash" "$target_deps_hash" >"$tmp"
     mv -- "$tmp" "$checksum_file"
 }
 
 fake_hash="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-write_checksums "$rev" "$src_hash" "$fake_hash"
+write_checksums "$upstream_version" "$rev" "$src_hash" "$fake_hash"
 
 echo "Calculating the Meson dependency hash"
 set +e
@@ -89,12 +101,13 @@ if [[ $meson_deps_hash != sha256-* ]]; then
     exit 1
 fi
 
-write_checksums "$rev" "$src_hash" "$meson_deps_hash"
+write_checksums "$upstream_version" "$rev" "$src_hash" "$meson_deps_hash"
 echo "Validating Rizin and rizin-rs"
 nix build .#rizin --no-link --print-build-logs
 nix build .#rizin-rs --no-link --print-build-logs
 
 echo "Updated nix/rizin/checksum.json"
+echo "  version: $upstream_version"
 echo "  rev: $rev"
 echo "  srcHash: $src_hash"
 echo "  mesonDepsHash: $meson_deps_hash"

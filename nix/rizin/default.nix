@@ -59,7 +59,7 @@ let
   } ./meson-deps-config-hook.sh;
 in
 rizin.overrideAttrs (prevAttrs: {
-  version = "unstable-${builtins.substring 0 12 checksums.rev}";
+  version = "${checksums.version}-unstable-${builtins.substring 0 12 checksums.rev}";
   inherit src mesonDeps;
   patches = builtins.filter (
     patch: builtins.baseNameOf patch != "0001-fix-compilation-with-clang.patch"

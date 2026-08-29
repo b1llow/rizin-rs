@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let lib_name = "rz_core";
     if let Ok(librz) = pkg_config::Config::new()
-        .atleast_version("0.8.0")
+        .range_version("0.10.0".."0.11.0")
         // .statik(true)            // 需要静态链接时可打开
         .probe(lib_name)
     {

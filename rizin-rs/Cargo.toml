@@ -1,7 +1,13 @@
 [package]
 name = "rizin-rs"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+license = "CC0-1.0"
+description = "Safe Rust bindings for the Rizin reverse-engineering framework."
+repository.workspace = true
+readme.workspace = true
+keywords = ["rizin", "reverse-engineering", "binary-analysis", "bindings"]
+categories = ["development-tools"]
 
 [[bench]]
 name = "my_benchmark"
@@ -9,7 +15,7 @@ harness = false
 
 [dependencies]
 anyhow = "1.0.86"
-rizin-sys = { version = "0.9.1", path = "../rizin-sys" }
+rizin-sys = { version = "=0.10.0-alpha.1", path = "../rizin-sys" }
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["html_reports"] }

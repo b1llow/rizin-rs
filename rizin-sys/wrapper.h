@@ -1,3 +1,9 @@
+#include <rz_build_version.h>
+
+#if RZ_VERSION_MAJOR != 0 || RZ_VERSION_MINOR != 10
+#error "rizin-sys 0.10 requires Rizin 0.10.x"
+#endif
+
 #include <rz_agraph.h>
 #include <rz_analysis.h>
 #include <rz_arch.h>
@@ -7,7 +13,6 @@
 #include <rz_bin_dwarf.h>
 #include <rz_bin_source_line.h>
 #include <rz_bp.h>
-#include <rz_build_version.h>
 #include <rz_cmd.h>
 #include <rz_cmp.h>
 #include <rz_config.h>

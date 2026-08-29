@@ -1,5 +1,5 @@
 {
-  description = "Rust rizin bindings";
+  description = "Safe Rust bindings for the Rizin reverse-engineering framework.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

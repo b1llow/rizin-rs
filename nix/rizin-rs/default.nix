@@ -1,13 +1,17 @@
 {
+  lib,
   llvmPackages_18,
   pkg-config,
   rizin,
   rustPlatform,
 }:
 
+let
+  workspaceManifest = lib.importTOML ../../Cargo.toml;
+in
 rustPlatform.buildRustPackage {
   pname = "rizin-rs";
-  inherit (rizin) version;
+  version = workspaceManifest.workspace.package.version;
 
   src = ../..;
   cargoLock.lockFile = ../../Cargo.lock;

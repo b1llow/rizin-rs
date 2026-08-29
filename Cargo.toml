@@ -1,3 +1,9 @@
 [workspace]
 resolver = "3"
-members = [ "rizin-rs","rizin-sys"]
+members = [ "rizin-rs", "rizin-sys" ]
+
+[workspace.package]
+version = "0.10.0-alpha.1"
+edition = "2024"
+repository = "https://github.com/b1llow/rizin-rs"
+readme = "README.md"
